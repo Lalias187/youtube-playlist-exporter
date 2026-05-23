@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Music Exporter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container { width: 100%; max-width: 640px; }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    h2 { font-size: 22px; font-weight: 700; }
+
+    .subtitle {
+      color: #aaa;
+      margin-bottom: 36px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* Sections */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* Buttons */
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-google:hover { background: #f0f0f0; box-shadow: 0 4px 16px rgba(255,255,255,0.1); }
+
+    .btn-primary {
+      background: #FF0000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #cc0000; }
+
+    .btn-secondary {
+      background: #1f1f1f;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px 22px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-secondary:hover { background: #2a2a2a; color: #fff; }
+
+    .btn-back {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .btn-back:hover { color: #fff; }
+
+    /* Playlists */
+    .playlist-grid { display: grid; gap: 10px; margin-top: 24px; }
+
+    .playlist-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #1a1a1a;
+      border: 1px solid #252525;
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .playlist-card:hover { border-color: #FF0000; background: #1d1d1d; }
+
+    .playlist-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #2a2a2a;
+      flex-shrink: 0;
+    }
+
+    .playlist-info h3 { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .playlist-info p { color: #777; font-size: 13px; }
+
+    /* Export */
+    .export-header { margin-bottom: 20px; }
+    .export-meta { color: #777; font-size: 14px; margin-top: 6px; }
+
+    .export-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    /* Track list */
+    .track-list {
+      background: #141414;
+      border-radius: 10px;
+      border: 1px solid #222;
+      overflow: hidden;
+    }
+
+    .track-list-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid #222;
+      font-size: 11px;
+      color: #555;
+      display: grid;
+      grid-template-columns: 36px 1fr 1fr;
+      gap: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .track-item {
+      padding: 11px 16px;
+      display: grid;
+      grid-template-columns: 36px 1fr 1fr;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid #1a1a1a;
+      font-size: 13px;
+      transition: background 0.1s;
+    }
+    .track-item:last-child { border-bottom: none; }
+    .track-item:hover { background: #1a1a1a; }
+
+    .track-num { color: #555; text-align: center; font-size: 12px; }
+    .track-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .track-artist { color: #777; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #666;
+      padding: 48px 0;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #2a2a2a;
+      border-top-color: #FF0000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .error {
+      background: #1f1010;
+      border: 1px solid #4a1a1a;
+      color: #ff9999;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1f1f1f;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 11px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
+      z-index: 100;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Compat hint */
+    .compat-hint {
+      margin-top: 24px;
+      padding: 14px 16px;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #666;
+      line-height: 1.6;
+    }
+    .compat-hint strong { color: #999; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Login -->
+  <div id="section-login" class="section active">
+    <div class="logo">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="#FF0000">
+        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+      <h1>YouTube Music Exporter</h1>
+    </div>
+    <p class="subtitle">Exporte tes playlists privées pour les importer dans Spotify, Apple Music, Tidal et d'autres services.</p>
+    <button class="btn-google" id="btn-connect">
+      <svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Se connecter avec Google
+    </button>
+    <div id="login-error"></div>
+    <div class="compat-hint">
+      <strong>Compatible avec :</strong> Soundiiz, TuneMyMusic, Spotify (import CSV), Apple Music, Tidal, Deezer, Amazon Music
+    </div>
+  </div>
+
+  <!-- Playlists -->
+  <div id="section-playlists" class="section">
+    <h2>Tes playlists</h2>
+    <p style="color:#777;font-size:14px;margin-top:6px;margin-bottom:0">Clique sur une playlist pour l'exporter.</p>
+    <div id="playlists-loading" class="loading">
+      <div class="spinner"></div>
+      <span>Chargement des playlists…</span>
+    </div>
+    <div id="playlist-grid" class="playlist-grid"></div>
+    <div id="playlists-error"></div>
+  </div>
+
+  <!-- Export -->
+  <div id="section-export" class="section">
+    <button class="btn-back" id="btn-back">← Retour</button>
+    <div class="export-header">
+      <h2 id="export-playlist-name"></h2>
+      <p class="export-meta" id="export-meta"></p>
+    </div>
+    <div id="export-loading" class="loading">
+      <div class="spinner"></div>
+      <span>Récupération des titres…</span>
+    </div>
+    <div id="export-content" style="display:none">
+      <div class="export-buttons">
+        <button class="btn-primary" id="btn-csv">⬇ Exporter CSV</button>
+        <button class="btn-secondary" id="btn-json">⬇ Exporter JSON</button>
+        <button class="btn-secondary" id="btn-soundiiz">Ouvrir Soundiiz →</button>
+        <button class="btn-secondary" id="btn-tunemymusic">TuneMyMusic →</button>
+      </div>
+      <div class="track-list">
+        <div class="track-list-header">
+          <span>#</span>
+          <span>Titre</span>
+          <span>Artiste</span>
+        </div>
+        <div id="track-list-body"></div>
+      </div>
+    </div>
+    <div id="export-error"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let accessToken = null;
+  let currentTracks = [];
+  let appConfig = {};
+
+  async function loadConfig() {
+    const res = await fetch('/.netlify/functions/config');
+    appConfig = await res.json();
+  }
+
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function handleOAuthCallback(code) {
+    showSection('section-playlists');
+    try {
+      const res = await fetch('/.netlify/functions/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      accessToken = data.access_token;
+      sessionStorage.setItem('yt_token', accessToken);
+      history.replaceState({}, '', window.location.pathname);
+      loadPlaylists();
+    } catch {
+      document.getElementById('login-error').innerHTML = '<div class="error">Erreur d\'authentification. Réessaie.</div>';
+      showSection('section-login');
+    }
+  }
+
+  async function loadPlaylists() {
+    showSection('section-playlists');
+    document.getElementById('playlists-loading').style.display = 'flex';
+    document.getElementById('playlist-grid').innerHTML = '';
+    document.getElementById('playlists-error').innerHTML = '';
+    try {
+      const res = await fetch('/.netlify/functions/playlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken }),
+      });
+      const data = await res.json();
+      document.getElementById('playlists-loading').style.display = 'none';
+
+      const grid = document.getElementById('playlist-grid');
+      if (!data.playlists || data.playlists.length === 0) {
+        grid.innerHTML = '<p style="color:#666;padding:32px 0">Aucune playlist trouvée.</p>';
+        return;
+      }
+
+      data.playlists.forEach(pl => {
+        const thumb = pl.snippet.thumbnails?.medium?.url || pl.snippet.thumbnails?.default?.url || '';
+        const count = pl.contentDetails?.itemCount ?? '?';
+        const card = document.createElement('div');
+        card.className = 'playlist-card';
+        card.innerHTML = `
+          ${thumb
+            ? `<img src="${escapeHtml(thumb)}" class="playlist-thumb" alt="">`
+            : '<div class="playlist-thumb"></div>'}
+          <div class="playlist-info">
+            <h3>${escapeHtml(pl.snippet.title)}</h3>
+            <p>${count} titre${count > 1 ? 's' : ''}</p>
+          </div>
+        `;
+        card.addEventListener('click', () => loadExport(pl));
+        grid.appendChild(card);
+      });
+    } catch {
+      document.getElementById('playlists-loading').style.display = 'none';
+      document.getElementById('playlists-error').innerHTML = '<div class="error">Impossible de charger les playlists. Vérifie ta connexion et réessaie.</div>';
+    }
+  }
+
+  async function loadExport(playlist) {
+    showSection('section-export');
+    document.getElementById('export-playlist-name').textContent = playlist.snippet.title;
+    document.getElementById('export-meta').textContent = 'Chargement…';
+    document.getElementById('export-loading').style.display = 'flex';
+    document.getElementById('export-content').style.display = 'none';
+    document.getElementById('export-error').innerHTML = '';
+
+    try {
+      const res = await fetch('/.netlify/functions/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken, playlistId: playlist.id }),
+      });
+      const data = await res.json();
+
+      currentTracks = data.videos
+        .filter(v => v.snippet.title !== 'Deleted video' && v.snippet.title !== 'Private video')
+        .map(v => ({
+          title: v.snippet.title,
+          artist: (v.snippet.videoOwnerChannelTitle || '').replace(/ - Topic$/, ''),
+          album: '',
+          url: `https://www.youtube.com/watch?v=${v.snippet.resourceId?.videoId || ''}`,
+        }));
+
+      document.getElementById('export-meta').textContent = `${currentTracks.length} titre${currentTracks.length > 1 ? 's' : ''}`;
+      document.getElementById('export-loading').style.display = 'none';
+      document.getElementById('export-content').style.display = 'block';
+
+      const body = document.getElementById('track-list-body');
+      body.innerHTML = currentTracks.map((t, i) => `
+        <div class="track-item">
+          <span class="track-num">${i + 1}</span>
+          <span class="track-name" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+          <span class="track-artist" title="${escapeHtml(t.artist)}">${escapeHtml(t.artist)}</span>
+        </div>
+      `).join('');
+    } catch {
+      document.getElementById('export-loading').style.display = 'none';
+      document.getElementById('export-error').innerHTML = '<div class="error">Erreur lors du chargement des titres.</div>';
+    }
+  }
+
+  function csvEscape(str) {
+    return '"' + String(str).replace(/"/g, '""') + '"';
+  }
+
+  function exportCSV() {
+    const rows = [['Track Name', 'Artist Name', 'Album'].join(',')];
+    currentTracks.forEach(t => {
+      rows.push([csvEscape(t.title), csvEscape(t.artist), csvEscape(t.album)].join(','));
+    });
+    download('playlist.csv', rows.join('\n'), 'text/csv;charset=utf-8;');
+    showToast('CSV exporté — prêt pour Soundiiz / TuneMyMusic');
+  }
+
+  function exportJSON() {
+    download('playlist.json', JSON.stringify(currentTracks, null, 2), 'application/json');
+    showToast('JSON exporté');
+  }
+
+  function download(filename, content, mime) {
+    const blob = new Blob(['﻿' + content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Events
+  document.getElementById('btn-connect').addEventListener('click', async () => {
+    try {
+      await loadConfig();
+      const params = new URLSearchParams({
+        client_id: appConfig.clientId,
+        redirect_uri: appConfig.redirectUri,
+        response_type: 'code',
+        scope: 'https://www.googleapis.com/auth/youtube.readonly',
+        access_type: 'offline',
+        prompt: 'consent',
+      });
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    } catch {
+      document.getElementById('login-error').innerHTML = '<div class="error">Impossible de charger la configuration. L\'app est-elle bien déployée sur Netlify ?</div>';
+    }
+  });
+
+  document.getElementById('btn-back').addEventListener('click', () => showSection('section-playlists'));
+  document.getElementById('btn-csv').addEventListener('click', exportCSV);
+  document.getElementById('btn-json').addEventListener('click', exportJSON);
+  document.getElementById('btn-soundiiz').addEventListener('click', () => window.open('https://soundiiz.com/tutorial/csv', '_blank'));
+  document.getElementById('btn-tunemymusic').addEventListener('click', () => window.open('https://www.tunemymusic.com/transfer', '_blank'));
+
+  // Init
+  (async () => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if (code) {
+      await handleOAuthCallback(code);
+      return;
+    }
+
+    const token = sessionStorage.getItem('yt_token');
+    if (token) {
+      accessToken = token;
+      loadPlaylists();
+      return;
+    }
+
+    showSection('section-login');
+  })();
+</script>
+</body>
+</html>

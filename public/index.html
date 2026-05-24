@@ -368,7 +368,11 @@
           code_verifier: verifier,
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error('Google token error:', errData);
+        throw new Error(errData.error || 'token_error');
+      }
       const data = await res.json();
       accessToken = data.access_token;
       sessionStorage.setItem('yt_token', accessToken);

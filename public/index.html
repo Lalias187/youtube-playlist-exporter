@@ -462,12 +462,22 @@
   }
 
   function exportJSON() {
-    download('playlist.json', JSON.stringify(currentTracks, null, 2), 'application/json');
+    downloadRaw('playlist.json', JSON.stringify(currentTracks, null, 2), 'application/json');
     showToast('JSON exporté');
   }
 
   function download(filename, content, mime) {
     const blob = new Blob(['﻿' + content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadRaw(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

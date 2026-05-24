@@ -313,13 +313,24 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  const CLIENT_ID = '180153068963-7f7vtglfur34karka1rop2q623to9vjv.apps.googleusercontent.com';
+  const REDIRECT_URI = 'https://lalias187.github.io/youtube-playlist-exporter/';
+
   let accessToken = null;
   let currentTracks = [];
-  let appConfig = {};
 
-  async function loadConfig() {
-    const res = await fetch('/api/config');
-    appConfig = await res.json();
+  function generateCodeVerifier() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return btoa(String.fromCharCode(...array))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  }
+
+  async function generateCodeChallenge(verifier) {
+    const data = new TextEncoder().encode(verifier);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode(...new Uint8Array(digest)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   function showSection(id) {
@@ -345,10 +356,17 @@
   async function handleOAuthCallback(code) {
     showSection('section-playlists');
     try {
-      const res = await fetch('/api/auth', {
+      const verifier = sessionStorage.getItem('pkce_verifier');
+      const res = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: CLIENT_ID,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: REDIRECT_URI,
+          code_verifier: verifier,
+        }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -368,21 +386,39 @@
     document.getElementById('playlist-grid').innerHTML = '';
     document.getElementById('playlists-error').innerHTML = '';
     try {
-      const res = await fetch('/api/playlists', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken }),
-      });
-      const data = await res.json();
+      let playlists = [];
+      let pageToken = null;
+
+      do {
+        const params = new URLSearchParams({ part: 'snippet,contentDetails', mine: true, maxResults: 50 });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/playlists?${params}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const data = await res.json();
+        playlists = playlists.concat(data.items || []);
+        pageToken = data.nextPageToken;
+      } while (pageToken);
+
+      const special = [{
+        id: 'LM',
+        snippet: {
+          title: "J'aime (Liked Music)",
+          thumbnails: { medium: { url: 'https://www.gstatic.com/youtube/img/music/liked_songs.png' } },
+        },
+        contentDetails: { itemCount: '?' },
+      }];
+
+      const allPlaylists = [...special, ...playlists];
       document.getElementById('playlists-loading').style.display = 'none';
 
       const grid = document.getElementById('playlist-grid');
-      if (!data.playlists || data.playlists.length === 0) {
+      if (allPlaylists.length === 0) {
         grid.innerHTML = '<p style="color:#666;padding:32px 0">Aucune playlist trouvée.</p>';
         return;
       }
 
-      data.playlists.forEach(pl => {
+      allPlaylists.forEach(pl => {
         const thumb = pl.snippet.thumbnails?.medium?.url || pl.snippet.thumbnails?.default?.url || '';
         const count = pl.contentDetails?.itemCount ?? '?';
         const card = document.createElement('div');
@@ -414,14 +450,21 @@
     document.getElementById('export-error').innerHTML = '';
 
     try {
-      const res = await fetch('/api/videos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken, playlistId: playlist.id }),
-      });
-      const data = await res.json();
+      let videos = [];
+      let pageToken = null;
 
-      currentTracks = data.videos
+      do {
+        const params = new URLSearchParams({ part: 'snippet,contentDetails', playlistId: playlist.id, maxResults: 50 });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?${params}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const data = await res.json();
+        videos = videos.concat(data.items || []);
+        pageToken = data.nextPageToken;
+      } while (pageToken);
+
+      currentTracks = videos
         .filter(v => v.snippet.title !== 'Deleted video' && v.snippet.title !== 'Private video')
         .map(v => ({
           title: v.snippet.title,
@@ -488,22 +531,21 @@
     URL.revokeObjectURL(url);
   }
 
-  // Events
   document.getElementById('btn-connect').addEventListener('click', async () => {
-    try {
-      await loadConfig();
-      const params = new URLSearchParams({
-        client_id: appConfig.clientId,
-        redirect_uri: appConfig.redirectUri,
-        response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/youtube.readonly',
-        access_type: 'offline',
-        prompt: 'consent',
-      });
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-    } catch {
-      document.getElementById('login-error').innerHTML = '<div class="error">Impossible de charger la configuration. L\'app est-elle bien déployée sur Netlify ?</div>';
-    }
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    sessionStorage.setItem('pkce_verifier', verifier);
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/youtube.readonly',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   });
 
   document.getElementById('btn-back').addEventListener('click', () => showSection('section-playlists'));
@@ -512,7 +554,6 @@
   document.getElementById('btn-soundiiz').addEventListener('click', () => window.open('https://soundiiz.com/tutorial/csv', '_blank'));
   document.getElementById('btn-tunemymusic').addEventListener('click', () => window.open('https://www.tunemymusic.com/transfer', '_blank'));
 
-  // Init
   (async () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');

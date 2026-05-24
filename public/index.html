@@ -462,7 +462,9 @@
   }
 
   function exportJSON() {
-    downloadRaw('playlist.json', JSON.stringify(currentTracks, null, 2), 'application/json');
+    const playlistName = document.getElementById('export-playlist-name').textContent || 'Playlist';
+    const payload = { name: playlistName, tracks: currentTracks };
+    downloadRaw('playlist.json', JSON.stringify(payload, null, 2), 'application/json');
     showToast('JSON exporté');
   }
 

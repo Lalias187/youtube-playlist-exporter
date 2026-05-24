@@ -318,7 +318,7 @@
   let appConfig = {};
 
   async function loadConfig() {
-    const res = await fetch('/.netlify/functions/config');
+    const res = await fetch('/api/config');
     appConfig = await res.json();
   }
 
@@ -345,7 +345,7 @@
   async function handleOAuthCallback(code) {
     showSection('section-playlists');
     try {
-      const res = await fetch('/.netlify/functions/auth', {
+      const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
@@ -368,7 +368,7 @@
     document.getElementById('playlist-grid').innerHTML = '';
     document.getElementById('playlists-error').innerHTML = '';
     try {
-      const res = await fetch('/.netlify/functions/playlists', {
+      const res = await fetch('/api/playlists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessToken }),
@@ -414,7 +414,7 @@
     document.getElementById('export-error').innerHTML = '';
 
     try {
-      const res = await fetch('/.netlify/functions/videos', {
+      const res = await fetch('/api/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessToken, playlistId: playlist.id }),

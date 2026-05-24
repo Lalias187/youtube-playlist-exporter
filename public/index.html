@@ -464,10 +464,41 @@
   }
 
   function exportJSON() {
-    const playlistName = document.getElementById('export-playlist-name').textContent || 'Playlist';
-    const payload = { name: playlistName, tracks: currentTracks };
+    const order = [];
+    const payload = {};
+
+    currentTracks.forEach(t => {
+      const videoId = t.url.split('v=')[1] || '';
+      order.push(videoId);
+      payload[videoId] = {
+        id: videoId,
+        album: t.album || '',
+        album_id: '',
+        artist: t.artist,
+        duration: '',
+        genre: 'YouTube',
+        has_lyrics: 'false',
+        image: `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+        language: 'YouTube',
+        release_date: null,
+        subtitle: t.artist,
+        title: t.title,
+        url: '',
+        allUrls: null,
+        year: 'null',
+        '320kbps': 'false',
+        quality: null,
+        perma_url: t.url,
+        expire_at: '',
+        youtube_video_id: videoId,
+        dateAdded: new Date().toISOString().replace('T', ' ').slice(0, 23),
+      };
+    });
+
+    payload._order = order;
+
     downloadRaw('playlist.json', JSON.stringify(payload, null, 2), 'application/json');
-    showToast('JSON exporté');
+    showToast('JSON exporté — prêt pour Joytify');
   }
 
   function download(filename, content, mime) {
